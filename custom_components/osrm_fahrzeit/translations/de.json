@@ -1,0 +1,61 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Fahrzeit einrichten",
+        "description": "Berechnet Fahrzeit und Strecke von einer Person zu einer Zone über einen OSRM-Routendienst. Vorgabe ist der Dienst des FOSSGIS e.V. (OpenStreetMap); bei jeder Abfrage gehen Standort und Zielposition an diesen Server.",
+        "data": {
+          "name": "Name",
+          "tracker": "Person oder Tracker",
+          "ziel": "Ziel (Zone)",
+          "server": "OSRM-Server"
+        }
+      }
+    },
+    "error": {
+      "ziel_ohne_position": "Die Zone hat keine Position.",
+      "ungueltige_adresse": "Die Adresse muss mit http:// oder https:// beginnen.",
+      "nicht_erreichbar": "Der Routendienst ist nicht erreichbar oder liefert keine Route."
+    },
+    "abort": {
+      "already_configured": "Diese Kombination aus Person und Ziel ist schon eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Abfragen und Rückfall",
+        "description": "Die Bremse schont den Routendienst: neue Abfragen nur nach Bewegung oder wenn der Wert zu alt ist, Pause nach Fehlern, Tageslimit. Solange nicht abgefragt werden darf, wird über die Luftlinie geschätzt.",
+        "data": {
+          "nur_unterwegs": "Nur abfragen, wenn die Person nicht am Ziel ist",
+          "min_bewegung": "Neue Abfrage nach Bewegung von mindestens",
+          "max_alter": "Spätestens neu abfragen nach",
+          "min_abstand": "Mindestabstand zwischen zwei Abfragen",
+          "pause": "Pause nach einem Fehler",
+          "tageslimit": "Höchstens Abfragen pro Tag",
+          "luftlinie_kmh": "Geschwindigkeit für die Luftlinien-Schätzung"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "dauer": {
+        "name": "Fahrzeit"
+      },
+      "strecke": {
+        "name": "Strecke"
+      }
+    },
+    "binary_sensor": {
+      "gestoert": {
+        "name": "Routendienst gestört"
+      }
+    },
+    "button": {
+      "abfragen": {
+        "name": "Jetzt abfragen"
+      }
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up travel time",
+        "description": "Calculates travel time and distance from a person to a zone using an OSRM routing service. Default is the FOSSGIS e.V. service (OpenStreetMap); every query sends the location and destination to that server.",
+        "data": {
+          "name": "Name",
+          "tracker": "Person or tracker",
+          "ziel": "Destination (zone)",
+          "server": "OSRM server"
+        }
+      }
+    },
+    "error": {
+      "ziel_ohne_position": "The zone has no position.",
+      "ungueltige_adresse": "The address must start with http:// or https://.",
+      "nicht_erreichbar": "The routing service is unreachable or returned no route."
+    },
+    "abort": {
+      "already_configured": "This person/destination pair is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Queries and fallback",
+        "description": "The brake protects the routing service: new queries only after movement or when the value is stale, a pause after errors, and a daily limit. While no query is allowed, travel time is estimated from the straight-line distance.",
+        "data": {
+          "nur_unterwegs": "Only query while the person is away from the destination",
+          "min_bewegung": "New query after moving at least",
+          "max_alter": "Query again at the latest after",
+          "min_abstand": "Minimum time between two queries",
+          "pause": "Pause after an error",
+          "tageslimit": "Maximum queries per day",
+          "luftlinie_kmh": "Speed for the straight-line estimate"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "dauer": {
+        "name": "Travel time"
+      },
+      "strecke": {
+        "name": "Distance"
+      }
+    },
+    "binary_sensor": {
+      "gestoert": {
+        "name": "Routing service problem"
+      }
+    },
+    "button": {
+      "abfragen": {
+        "name": "Query now"
+      }
+    }
+  }
+}
