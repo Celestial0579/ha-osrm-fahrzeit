@@ -10,7 +10,7 @@ brauche ich nach Hause?“ – über einen [OSRM](https://project-osrm.org/)-Rou
 
 | Entität | Bedeutung |
 |---|---|
-| **Fahrzeit** (min) | kürzeste Fahrzeit ohne Stau; Attribut `quelle`: OpenStreetMap, gespeichert, Luftlinie oder am Ziel |
+| **Fahrzeit** (min) | kürzeste Fahrzeit ohne Stau; Attribut `quelle`: OpenStreetMap, gespeichert, hochgerechnet, Luftlinie oder am Ziel |
 | **Strecke** (km) | Straßenkilometer |
 | **Routendienst gestört** | an, wenn die letzte Abfrage fehlschlug oder das Tageslimit erreicht ist; Attribute `zustand`, `letzte_erfolgreiche_abfrage`, `letzter_fehler`, `anfragen_heute` |
 | **Jetzt abfragen** | fragt sofort neu ab (Pause und Tageslimit gelten weiter) |
@@ -21,8 +21,10 @@ brauche ich nach Hause?“ – über einen [OSRM](https://project-osrm.org/)-Rou
 - **Mindestabstand** zwischen zwei Abfragen: 5 Minuten
 - nach einem **Fehler** 30 Minuten Pause
 - **Tageslimit** 150 Abfragen
-- dazwischen Schätzung über die **Luftlinie** (Vorgabe 120 km/h – bewusst schnell, damit die Zeit eher
-  unterschätzt wird)
+- dazwischen **hochgerechnet**: Luftlinie × Umwegfaktor der letzten Route derselben Fahrt (höchstens 60 Minuten
+  alt) – so springt der Wert zwischen zwei Abfragen nicht auf einen Bruchteil
+- ohne passende letzte Abfrage (Fehlerpause, Tageslimit, neue Fahrt) Schätzung über die **Luftlinie** (Vorgabe
+  120 km/h – bewusst schnell, damit die Zeit eher unterschätzt wird)
 - ist die Person **am Ziel**, wird nicht abgefragt (Fahrzeit 0)
 
 ## Einrichtung

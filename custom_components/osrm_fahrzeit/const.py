@@ -29,3 +29,7 @@ STANDARD_OPTIONEN = {
 
 ATTRIBUTION = "Daten: © OpenStreetMap-Mitwirkende (ODbL)"
 NACHFUEHREN_MINUTEN = 15
+
+# Hochrechnen zwischen zwei Abfragen derselben Fahrt: Luftlinie × Umwegfaktor der letzten Route
+MIN_LUFTLINIE_KM = 0.5  # darunter ist der Faktor der letzten Abfrage zu ungenau (fast am Ziel)
+MAX_UMWEGFAKTOR = 6.0  # Stadtverkehr gegen 120 km/h Luftlinie liegt um 3–4

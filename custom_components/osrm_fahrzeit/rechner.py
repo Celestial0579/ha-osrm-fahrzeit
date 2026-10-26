@@ -31,6 +31,8 @@ from .const import (
     CONF_TRACKER,
     CONF_ZIEL,
     DOMAIN,
+    MAX_UMWEGFAKTOR,
+    MIN_LUFTLINIE_KM,
     NACHFUEHREN_MINUTEN,
     STANDARD_OPTIONEN,
 )
@@ -210,10 +212,36 @@ class FahrzeitRechner:
         if not bewegt and isinstance(self._daten.get("m"), (int, float)):
             self.minuten, self.km, self.quelle = self._daten["m"], self._daten.get("km"), "OpenStreetMap (gespeichert)"
             return
-        luftlinie_km = (distance(lat, lon, ziel_pos[0], ziel_pos[1]) or 0) / 1000
-        self.minuten = round(luftlinie_km / float(self.opt(CONF_LUFTLINIE_KMH)) * 60, 1)
-        self.km = round(luftlinie_km, 1)
-        self.quelle = "Luftlinie"
+        self._schaetzen((float(lat), float(lon)), ziel_pos, jetzt)
+
+    def _schaetzen(self, pos: tuple[float, float], ziel: tuple[float, float], jetzt: float) -> None:
+        """Ohne frische Abfrage: Luftlinie, hochgerechnet mit dem Umwegfaktor der letzten Route derselben Fahrt.
+
+        Roh unterschätzt die Luftlinie (120 km/h) die Fahrzeit im Stadtverkehr um das Drei- bis Vierfache – der
+        Wert sprang zwischen zwei Abfragen von 11,9 auf 3,1 Minuten. Nur ohne passende letzte Abfrage bleibt es roh.
+        """
+        kmh = float(self.opt(CONF_LUFTLINIE_KMH))
+        luftlinie_km = (distance(pos[0], pos[1], ziel[0], ziel[1]) or 0) / 1000
+        faktor_min = faktor_km = None
+        alt_t, alt_m, alt_km = self._daten.get("t"), self._daten.get("m"), self._daten.get("km")
+        if (
+            alt_t
+            and jetzt - float(alt_t) <= 60 * float(self.opt(CONF_MAX_ALTER))
+            and isinstance(alt_m, (int, float))
+            and self._daten.get("la") is not None
+        ):
+            alt_luft_km = (distance(self._daten["la"], self._daten["lo"], ziel[0], ziel[1]) or 0) / 1000
+            if alt_luft_km >= MIN_LUFTLINIE_KM:
+                faktor_min = min(max(alt_m / (alt_luft_km / kmh * 60), 1.0), MAX_UMWEGFAKTOR)
+                faktor_km = min(max(float(alt_km or 0) / alt_luft_km, 1.0), MAX_UMWEGFAKTOR)
+        if faktor_min is not None and faktor_km is not None:
+            self.minuten = round(luftlinie_km / kmh * 60 * faktor_min, 1)
+            self.km = round(luftlinie_km * faktor_km, 1)
+            self.quelle = "OpenStreetMap (hochgerechnet)"
+        else:
+            self.minuten = round(luftlinie_km / kmh * 60, 1)
+            self.km = round(luftlinie_km, 1)
+            self.quelle = "Luftlinie"
 
     async def _abfragen(self, start: tuple[float, float], ziel: tuple[float, float], jetzt: float) -> None:
         heute = self._heute()
@@ -226,10 +254,7 @@ class FahrzeitRechner:
             _LOGGER.warning("Routendienst: %s – Pause %s min", err, self.opt(CONF_PAUSE))
             self._daten.update(q=jetzt, d=heute, n=anzahl, s=jetzt + 60 * float(self.opt(CONF_PAUSE)), f=str(err)[:200], ft=jetzt)
             self._speichern()
-            luftlinie_km = (distance(start[0], start[1], ziel[0], ziel[1]) or 0) / 1000
-            self.minuten = round(luftlinie_km / float(self.opt(CONF_LUFTLINIE_KMH)) * 60, 1)
-            self.km = round(luftlinie_km, 1)
-            self.quelle = "Luftlinie"
+            self._schaetzen(start, ziel, jetzt)
             return
         self.minuten, self.km, self.quelle = round(sekunden / 60, 1), round(meter / 1000, 1), "OpenStreetMap"
         self._daten.update(
