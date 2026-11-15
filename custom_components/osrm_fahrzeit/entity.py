@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity import Entity
@@ -23,7 +25,8 @@ class FahrzeitEntitaet(Entity):
             identifiers={(DOMAIN, rechner.entry.entry_id)},
             name=rechner.entry.title,
             manufacturer="OSRM",
-            model=rechner.entry.data[CONF_SERVER],
+            # Nur der Rechnername: Zugangsdaten in der Adresse gehören nicht ins Geräteregister.
+            model=urlsplit(rechner.entry.data[CONF_SERVER]).hostname or "OSRM",
             entry_type=DeviceEntryType.SERVICE,
         )
 
