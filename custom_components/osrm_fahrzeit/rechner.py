@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from datetime import datetime, timedelta
+import json
 import logging
+from pathlib import Path
 import time
 from typing import Any
 
@@ -38,11 +40,47 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-USER_AGENT = "HomeAssistant-osrm_fahrzeit/0.1 (+https://github.com/Celestial0579/ha-osrm-fahrzeit)"
+FASSUNG = json.loads(Path(__file__).with_name("manifest.json").read_text(encoding="utf-8"))["version"]
+USER_AGENT = f"HomeAssistant-osrm_fahrzeit/{FASSUNG} (+https://github.com/Celestial0579/ha-osrm-fahrzeit)"
+MIN_ABSTAND_SERVER = 1.0  # Sekunden zwischen zwei Abfragen an denselben Server, über alle Einträge
 
 
 class RoutenFehler(Exception):
     """Der Routendienst hat keine verwertbare Antwort geliefert."""
+
+
+def _fehlertext(err: BaseException) -> str:
+    """Art und Status, nie der Text der Ausnahme: der enthält oft die Adresse mit beiden Positionen."""
+    if isinstance(err, aiohttp.ClientResponseError) and err.status:
+        return f"HTTP {err.status}"
+    if isinstance(err, TimeoutError):
+        return "Zeitüberschreitung"
+    if isinstance(err, ValueError):
+        return "Antwort ist kein JSON"
+    return type(err).__name__
+
+
+class _Schranke:
+    """Eine Abfrage zur Zeit je Server, mit Mindestabstand, für alle Einträge gemeinsam."""
+
+    def __init__(self) -> None:
+        self.lock = asyncio.Lock()
+        self.zuletzt = 0.0
+
+    async def __aenter__(self) -> None:
+        await self.lock.acquire()
+        warten = self.zuletzt + MIN_ABSTAND_SERVER - time.monotonic()
+        if warten > 0:
+            await asyncio.sleep(warten)
+
+    async def __aexit__(self, *_args: Any) -> None:
+        self.zuletzt = time.monotonic()
+        self.lock.release()
+
+
+def schranke(hass: HomeAssistant, server: str) -> _Schranke:
+    schranken: dict[str, _Schranke] = hass.data.setdefault(DOMAIN, {}).setdefault("schranken", {})
+    return schranken.setdefault(server.rstrip("/"), _Schranke())
 
 
 async def route_abfragen(
@@ -62,11 +100,18 @@ async def route_abfragen(
                 raise RoutenFehler(f"HTTP {antwort.status}")
             daten = await antwort.json(content_type=None)
     except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-        raise RoutenFehler(str(err) or type(err).__name__) from err
+        raise RoutenFehler(_fehlertext(err)) from err
+    # Alles, was nicht die erwartete Form hat, ist ein RoutenFehler: nur der setzt Pause,
+    # Zähler und Mindestabstand fort.
+    if not isinstance(daten, dict):
+        raise RoutenFehler("unerwartete Antwort")
     routen = daten.get("routes") or []
-    if daten.get("code") != "Ok" or not routen:
-        raise RoutenFehler(str(daten.get("code") or "keine Route"))
-    return float(routen[0]["duration"]), float(routen[0]["distance"])
+    if daten.get("code") != "Ok" or not isinstance(routen, list) or not routen:
+        raise RoutenFehler(str(daten.get("code") or "keine Route")[:50])
+    try:
+        return float(routen[0]["duration"]), float(routen[0]["distance"])
+    except (KeyError, TypeError, ValueError) as err:
+        raise RoutenFehler("unerwartete Antwort") from err
 
 
 class FahrzeitRechner:
@@ -246,10 +291,10 @@ class FahrzeitRechner:
     async def _abfragen(self, start: tuple[float, float], ziel: tuple[float, float], jetzt: float) -> None:
         heute = self._heute()
         anzahl = self.anfragen_heute + 1
+        server = self.entry.data[CONF_SERVER]
         try:
-            sekunden, meter = await route_abfragen(
-                async_get_clientsession(self.hass), self.entry.data[CONF_SERVER], start, ziel
-            )
+            async with schranke(self.hass, server):
+                sekunden, meter = await route_abfragen(async_get_clientsession(self.hass), server, start, ziel)
         except RoutenFehler as err:
             _LOGGER.warning("Routendienst: %s – Pause %s min", err, self.opt(CONF_PAUSE))
             self._daten.update(q=jetzt, d=heute, n=anzahl, s=jetzt + 60 * float(self.opt(CONF_PAUSE)), f=str(err)[:200], ft=jetzt)

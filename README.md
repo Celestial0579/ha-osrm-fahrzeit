@@ -20,7 +20,8 @@ brauche ich nach Hause?“ – über einen [OSRM](https://project-osrm.org/)-Rou
 - neue Abfrage nur nach **Bewegung** (Vorgabe 500 m) oder wenn der Wert **älter** ist als 60 Minuten
 - **Mindestabstand** zwischen zwei Abfragen: 5 Minuten
 - nach einem **Fehler** 30 Minuten Pause
-- **Tageslimit** 150 Abfragen
+- **Tageslimit** 150 Abfragen je Eintrag
+- alle Einträge, die denselben Server nutzen, fragen **nacheinander** und mit mindestens einer Sekunde Abstand
 - dazwischen **hochgerechnet**: Luftlinie × Umwegfaktor der letzten Route derselben Fahrt (höchstens 60 Minuten
   alt) – so springt der Wert zwischen zwei Abfragen nicht auf einen Bruchteil
 - ohne passende letzte Abfrage (Fehlerpause, Tageslimit, neue Fahrt) Schätzung über die **Luftlinie** (Vorgabe
