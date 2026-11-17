@@ -207,6 +207,10 @@ class FahrzeitRechner:
         if self._nachlauf is not None:
             self._nachlauf()
             self._nachlauf = None
+        if self._daten:
+            # Ausstehendes verzögertes Speichern jetzt erledigen: Sonst schriebe es die Position nach
+            # dem Entfernen des Eintrags (async_remove_entry) wieder auf den Datenträger (#9).
+            await self._store.async_save(self._daten)
 
     @callback
     def _bei_aenderung(self, _ereignis: Event) -> None:
