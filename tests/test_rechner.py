@@ -18,7 +18,7 @@ from custom_components.osrm_fahrzeit import rechner as modul
 from custom_components.osrm_fahrzeit.const import DOMAIN
 from custom_components.osrm_fahrzeit.rechner import FahrzeitRechner, RoutenFehler, route_abfragen
 
-START, ZIEL = (52.123456, 9.123456), (52.2, 9.3)
+START, ZIEL = (52.516275, 13.377704), (52.366667, 13.503333)  # Brandenburger Tor, Flughafen BER
 
 
 @pytest.fixture
@@ -55,7 +55,7 @@ async def test_route_abfragen(hass: HomeAssistant, dienst) -> None:
         with pytest.raises(RoutenFehler) as fehler:
             await route_abfragen(sitzung, server, START, ZIEL)
         assert text in str(fehler.value)
-        assert "52.12" not in str(fehler.value) and "9.12" not in str(fehler.value)  # kein Standort
+        assert "52.51" not in str(fehler.value) and "13.37" not in str(fehler.value)  # kein Standort
 
 
 def _eintrag(hass: HomeAssistant, server: str = "https://nutzer:geheim@osrm.example/") -> MockConfigEntry:
