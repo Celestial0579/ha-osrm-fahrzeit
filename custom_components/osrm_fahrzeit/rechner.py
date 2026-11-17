@@ -43,6 +43,8 @@ _LOGGER = logging.getLogger(__name__)
 FASSUNG = json.loads(Path(__file__).with_name("manifest.json").read_text(encoding="utf-8"))["version"]
 USER_AGENT = f"HomeAssistant-osrm_fahrzeit/{FASSUNG} (+https://github.com/Celestial0579/ha-osrm-fahrzeit)"
 MIN_ABSTAND_SERVER = 1.0  # Sekunden zwischen zwei Abfragen an denselben Server, über alle Einträge
+# Eine Antwort mit overview=false&steps=false hat unter 2 KB. Mehr wird nicht gelesen (GHSA-5v4m-v9rj-87mw).
+MAX_ANTWORT = 65536
 
 
 class RoutenFehler(Exception):
@@ -93,12 +95,18 @@ async def route_abfragen(
         "?overview=false&alternatives=false&steps=false"
     )
     try:
+        # Keine Weiterleitungen: Ein OSRM-Server leitet nicht weiter, eine 3xx-Antwort ist ein Fehler mit Pause.
         async with sitzung.get(
-            url, headers={"User-Agent": USER_AGENT}, timeout=aiohttp.ClientTimeout(total=20)
+            url, headers={"User-Agent": USER_AGENT}, timeout=aiohttp.ClientTimeout(total=20), allow_redirects=False
         ) as antwort:
             if antwort.status != 200:
                 raise RoutenFehler(f"HTTP {antwort.status}")
-            daten = await antwort.json(content_type=None)
+            roh = bytearray()
+            async for stueck in antwort.content.iter_chunked(8192):
+                roh.extend(stueck)
+                if len(roh) > MAX_ANTWORT:
+                    raise RoutenFehler("Antwort zu groß")
+        daten = json.loads(roh)
     except (aiohttp.ClientError, TimeoutError, ValueError) as err:
         raise RoutenFehler(_fehlertext(err)) from err
     # Alles, was nicht die erwartete Form hat, ist ein RoutenFehler: nur der setzt Pause,
