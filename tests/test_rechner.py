@@ -50,7 +50,7 @@ async def test_route_abfragen(hass: HomeAssistant, dienst) -> None:
     sitzung, server = async_get_clientsession(hass), f"http://127.0.0.1:{dienst.port}"
     assert await route_abfragen(sitzung, server, START, ZIEL) == (600.0, 9000.0)
     for art, text in (("liste", "unerwartete Antwort"), ("null", "unerwartete Antwort"), ("ohne", "unerwartete Antwort"),
-                      ("noroute", "NoRoute"), ("429", "HTTP 429"), ("schleife", "TooManyRedirects")):
+                      ("noroute", "NoRoute"), ("429", "HTTP 429"), ("schleife", "HTTP 302")):
         dienst.app["zustand"]["art"] = art
         with pytest.raises(RoutenFehler) as fehler:
             await route_abfragen(sitzung, server, START, ZIEL)
