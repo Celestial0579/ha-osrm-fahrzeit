@@ -57,7 +57,7 @@ def _fehlertext(err: BaseException) -> str:
         return f"HTTP {err.status}"
     if isinstance(err, TimeoutError):
         return "Zeitüberschreitung"
-    if isinstance(err, ValueError):
+    if isinstance(err, (ValueError, RecursionError)):
         return "Antwort ist kein JSON"
     return type(err).__name__
 
@@ -107,7 +107,8 @@ async def route_abfragen(
                 if len(roh) > MAX_ANTWORT:
                     raise RoutenFehler("Antwort zu groß")
         daten = json.loads(roh)
-    except (aiohttp.ClientError, TimeoutError, ValueError) as err:
+    # RecursionError: tief verschachteltes JSON wie „[[[[…“, schon innerhalb der 64 KB möglich.
+    except (aiohttp.ClientError, TimeoutError, ValueError, RecursionError) as err:
         raise RoutenFehler(_fehlertext(err)) from err
     # Alles, was nicht die erwartete Form hat, ist ein RoutenFehler: nur der setzt Pause,
     # Zähler und Mindestabstand fort.

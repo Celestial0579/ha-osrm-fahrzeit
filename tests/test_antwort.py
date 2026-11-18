@@ -45,6 +45,8 @@ async def dienst(aiohttp_server):
             return antwort
         if art == "weiter":
             raise web.HTTPFound("http://192.168.178.1/relay/0?turn=on")
+        if art == "tief":  # unter der Grenze, aber zu tief verschachtelt für json.loads
+            return web.Response(body=b"[" * 60000, content_type="application/json")
         if art == "gepackt":  # wenige KB auf der Leitung, entpackt ENTPACKT Bytes
             zustand = request.app["zustand"]
             return web.Response(
@@ -65,6 +67,14 @@ async def dienst(aiohttp_server):
 async def test_uebergrosse_antwort_wird_abgebrochen(hass: HomeAssistant, dienst) -> None:
     dienst.app["zustand"]["art"] = "riesig"
     with pytest.raises(RoutenFehler, match="zu groß"):
+        await route_abfragen(async_get_clientsession(hass), f"http://127.0.0.1:{dienst.port}", START, ZIEL)
+
+
+@pytest.mark.usefixtures("socket_enabled")
+async def test_tief_verschachtelte_antwort_ist_routenfehler(hass: HomeAssistant, dienst) -> None:
+    """json.loads wirft bei „[[[[…“ RecursionError, kein ValueError; auch das muss ein RoutenFehler sein."""
+    dienst.app["zustand"]["art"] = "tief"
+    with pytest.raises(RoutenFehler, match="kein JSON"):
         await route_abfragen(async_get_clientsession(hass), f"http://127.0.0.1:{dienst.port}", START, ZIEL)
 
 
