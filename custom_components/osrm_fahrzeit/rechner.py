@@ -138,6 +138,7 @@ class FahrzeitRechner:
         self._abmelden: list[CALLBACK_TYPE] = []
         self._nachlauf: CALLBACK_TYPE | None = None
         self._lock = asyncio.Lock()
+        self._gestoppt = False
 
     # ------------------------------------------------------------ Einstellungen
     def opt(self, schluessel: str) -> Any:
@@ -207,9 +208,20 @@ class FahrzeitRechner:
         self._abmelden.append(
             async_track_time_interval(self.hass, self._takt, timedelta(minutes=NACHFUEHREN_MINUTEN))
         )
-        self.hass.async_create_background_task(self.async_berechnen(), f"{DOMAIN}_start")
+        self._starten("start")
+
+    def _starten(self, name: str) -> None:
+        """Abfrage als Hintergrundaufgabe des Eintrags.
+
+        Home Assistant bricht sie beim Entladen ab und wartet bis zu 10 s darauf, bevor
+        async_remove_entry den Speicher löscht (#15).
+        """
+        self.entry.async_create_background_task(self.hass, self.async_berechnen(), f"{DOMAIN}_{name}")
 
     async def async_stop(self) -> None:
+        # Ab hier nichts mehr verzögert speichern: Eine Abfrage, deren Antwort erst jetzt kommt,
+        # schriebe die Position sonst nach dem Entfernen wieder nach .storage (#15).
+        self._gestoppt = True
         for abmelden in self._abmelden:
             abmelden()
         self._abmelden.clear()
@@ -224,10 +236,11 @@ class FahrzeitRechner:
     @callback
     def _bei_aenderung(self, _ereignis: Event) -> None:
         if not self._lock.locked():
-            self.hass.async_create_background_task(self.async_berechnen(), f"{DOMAIN}_aenderung")
+            self._starten("aenderung")
 
-    async def _takt(self, _jetzt: datetime) -> None:
-        await self.async_berechnen()
+    @callback
+    def _takt(self, _jetzt: datetime) -> None:
+        self._starten("takt")
 
     # ------------------------------------------------------------ Berechnung
     async def async_berechnen(self, erzwingen: bool = False) -> None:
@@ -333,11 +346,13 @@ class FahrzeitRechner:
         @callback
         def _ausloesen(_jetzt: datetime) -> None:
             self._nachlauf = None
-            self.hass.async_create_background_task(self.async_berechnen(), f"{DOMAIN}_nachlauf")
+            self._starten("nachlauf")
 
         self._nachlauf = async_call_later(self.hass, max(sekunden, 1) + 1, _ausloesen)
 
     def _speichern(self) -> None:
+        if self._gestoppt:
+            return
         self._store.async_delay_save(lambda: self._daten, 2)
 
     @callback
